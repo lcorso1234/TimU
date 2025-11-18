@@ -43,10 +43,10 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-[#353e43] px-4 py-12">
       <div className="w-full max-w-md">
-        <article className="relative overflow-hidden rounded-[32px] border border-white/15 bg-gradient-to-b from-[#30363c] to-[#15191c] p-7 text-slate-100 shadow-[0_25px_60px_rgba(0,0,0,0.85)]">
-          <div className="pointer-events-none absolute inset-0 rounded-[32px] border border-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]" />
+        <article className="relative overflow-hidden rounded-[32px] border border-white/15 bg-[rgba(53,62,67,0.65)] p-7 text-slate-100 shadow-[0_25px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
+          <div className="pointer-events-none absolute inset-0 rounded-[32px] border border-white/10 bg-gradient-to-b from-white/10 via-white/0 to-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]" />
           <div className="relative space-y-6">
             <header className="space-y-2">
               <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
