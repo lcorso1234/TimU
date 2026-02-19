@@ -1,35 +1,100 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 const companyWebsite = "https://www.gtmechanical.com/";
 const phoneNumber = "+17088780840";
 
-const vcardContents = `BEGIN:VCARD
+type ContactFormValues = {
+  fullName: string;
+  email: string;
+  phone: string;
+};
+
+function escapeVCardValue(value: string) {
+  return value.replace(/[\\,;\n]/g, (char) => `\\${char}`);
+}
+
+async function getBase64FromPublicImage(path: string) {
+  const response = await fetch(path);
+  if (!response.ok) {
+    throw new Error(`Unable to load image: ${path}`);
+  }
+  const blob = await response.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to read image file."));
+    reader.readAsDataURL(blob);
+  });
+  return dataUrl.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
+}
+
+export default function Home() {
+  const [showSmsForm, setShowSmsForm] = useState(false);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [formValues, setFormValues] = useState<ContactFormValues>({
+    fullName: "",
+    email: "",
+    phone: "",
+  });
+
+  const handleSaveContact = useCallback(async () => {
+    if (isSavingContact) {
+      return;
+    }
+    setIsSavingContact(true);
+    try {
+      const base64Photo = await getBase64FromPublicImage("/GT.png");
+      const vcardContents = `BEGIN:VCARD
 VERSION:3.0
 N:Uher;Tim;;;
 FN:Tim “Bubbles” Uher
 ORG:GT Mechanical
 TEL;TYPE=CELL:${phoneNumber}
 URL:${companyWebsite}
+PHOTO;ENCODING=b;TYPE=PNG:${base64Photo}
+END:VCARD`;
+      const blob = new Blob([vcardContents], {
+        type: "text/vcard;charset=utf-8",
+      });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "tim-uher.vcf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+      setShowSmsForm(true);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSavingContact(false);
+    }
+  }, [isSavingContact]);
+
+  const handleSendSms = useCallback(() => {
+    const trimmedName = formValues.fullName.trim();
+    const trimmedEmail = formValues.email.trim();
+    const trimmedPhone = formValues.phone.trim();
+
+    const shareableContactCard = `BEGIN:VCARD
+VERSION:3.0
+FN:${escapeVCardValue(trimmedName || "New Contact")}
+TEL;TYPE=CELL:${escapeVCardValue(trimmedPhone || "Not provided")}
+EMAIL:${escapeVCardValue(trimmedEmail || "Not provided")}
 END:VCARD`;
 
-export default function Home() {
-  const handleSaveContact = useCallback(() => {
-    const blob = new Blob([vcardContents], {
-      type: "text/vcard;charset=utf-8",
-    });
-    const downloadUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = "tim-uher.vcf";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(downloadUrl);
+    const smsBody = `Hi Tim “Bubbles”, I grabbed your card and want to connect.
 
-    const smsBody =
-      "Hi Tim “Bubbles”, I’m reaching out after grabbing your card — let’s connect.";
+Name: ${trimmedName || "Not provided"}
+Email: ${trimmedEmail || "Not provided"}
+Phone: ${trimmedPhone || "Not provided"}
+
+Shareable contact:
+${shareableContactCard}`;
+
     const encodedBody = encodeURIComponent(smsBody);
     const ua = navigator.userAgent || "";
     const isiOS = /iPad|iPhone|iPod/.test(ua);
@@ -40,7 +105,14 @@ export default function Home() {
     setTimeout(() => {
       window.location.href = smsLink;
     }, 400);
-  }, []);
+  }, [formValues]);
+
+  const onFormChange = (field: keyof ContactFormValues, value: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#353e43] px-4 py-12">
@@ -67,17 +139,77 @@ export default function Home() {
               <button
                 type="button"
                 onClick={handleSaveContact}
+                disabled={isSavingContact}
                 className="animate-jiggle flex w-full items-center justify-center gap-2 rounded-2xl bg-[#39ff14] py-4 text-lg font-semibold text-slate-900 shadow-[0_15px_40px_rgba(57,255,20,0.45)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_45px_rgba(57,255,20,0.55)]"
               >
-                Save contact &amp; text Tim
+                {isSavingContact
+                  ? "Preparing contact..."
+                  : "Save contact & text Tim"}
                 <span aria-hidden="true" className="text-2xl">
                   ↗
                 </span>
               </button>
 
+              {showSmsForm ? (
+                <div className="space-y-3 rounded-2xl border border-white/10 bg-black/20 px-5 py-4 text-sm text-slate-200">
+                  <p className="text-sm font-medium text-slate-100">
+                    Contact saved. Want to send Tim a text?
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      inputMode="text"
+                      value={formValues.fullName}
+                      onChange={(event) =>
+                        onFormChange("fullName", event.target.value)
+                      }
+                      placeholder="Your full name"
+                      className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-slate-100 placeholder:text-slate-400 focus:border-[#39ff14] focus:outline-none"
+                    />
+                    <input
+                      type="email"
+                      inputMode="email"
+                      value={formValues.email}
+                      onChange={(event) =>
+                        onFormChange("email", event.target.value)
+                      }
+                      placeholder="Your email"
+                      className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-slate-100 placeholder:text-slate-400 focus:border-[#39ff14] focus:outline-none"
+                    />
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      value={formValues.phone}
+                      onChange={(event) =>
+                        onFormChange("phone", event.target.value)
+                      }
+                      placeholder="Your phone number"
+                      className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-slate-100 placeholder:text-slate-400 focus:border-[#39ff14] focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSendSms}
+                      className="flex-1 rounded-xl bg-[#39ff14] px-3 py-2 font-semibold text-slate-900 transition hover:brightness-95"
+                    >
+                      Send text
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSmsForm(false)}
+                      className="rounded-xl border border-white/20 px-3 py-2 font-medium text-slate-200 transition hover:bg-white/10"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="rounded-2xl border border-white/10 bg-black/20 px-5 py-4 text-sm text-slate-300">
-                Tap the neon button to download Tim&apos;s contact card and open
-                a ready-to-send message. Works seamlessly on Android and iOS.
+                Tap the neon button to save Tim&apos;s contact first, then choose
+                whether to send a text with your details. Works on Android and
+                iOS.
               </div>
             </section>
 
