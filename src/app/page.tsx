@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from "react";
 
-const companyWebsite = "https://www.gtmechanical.com/";
 const phoneNumber = "+17088780840";
 
 type ContactFormValues = {
@@ -10,25 +9,6 @@ type ContactFormValues = {
   email: string;
   phone: string;
 };
-
-function escapeVCardValue(value: string) {
-  return value.replace(/[\\,;\n]/g, (char) => `\\${char}`);
-}
-
-async function getBase64FromPublicImage(path: string) {
-  const response = await fetch(path);
-  if (!response.ok) {
-    throw new Error(`Unable to load image: ${path}`);
-  }
-  const blob = await response.blob();
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Failed to read image file."));
-    reader.readAsDataURL(blob);
-  });
-  return dataUrl.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
-}
 
 export default function Home() {
   const [showSmsForm, setShowSmsForm] = useState(false);
@@ -39,33 +19,18 @@ export default function Home() {
     phone: "",
   });
 
-  const handleSaveContact = useCallback(async () => {
+  const handleSaveContact = useCallback(() => {
     if (isSavingContact) {
       return;
     }
     setIsSavingContact(true);
     try {
-      const base64Photo = await getBase64FromPublicImage("/GT.png");
-      const vcardContents = `BEGIN:VCARD
-VERSION:3.0
-N:Uher;Tim;;;
-FN:Tim “Bubbles” Uher
-ORG:GT Mechanical
-TEL;TYPE=CELL:${phoneNumber}
-URL:${companyWebsite}
-PHOTO;ENCODING=b;TYPE=PNG:${base64Photo}
-END:VCARD`;
-      const blob = new Blob([vcardContents], {
-        type: "text/vcard;charset=utf-8",
-      });
-      const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = downloadUrl;
+      link.href = "/tim-uher.vcf";
       link.download = "tim-uher.vcf";
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(downloadUrl);
       setShowSmsForm(true);
     } catch (error) {
       console.error(error);
@@ -78,13 +43,7 @@ END:VCARD`;
     const trimmedName = formValues.fullName.trim();
     const trimmedEmail = formValues.email.trim();
     const trimmedPhone = formValues.phone.trim();
-
-    const shareableContactCard = `BEGIN:VCARD
-VERSION:3.0
-FN:${escapeVCardValue(trimmedName || "New Contact")}
-TEL;TYPE=CELL:${escapeVCardValue(trimmedPhone || "Not provided")}
-EMAIL:${escapeVCardValue(trimmedEmail || "Not provided")}
-END:VCARD`;
+    const shareableContactUrl = `${window.location.origin}/tim-uher.vcf`;
 
     const smsBody = `Hi Tim “Bubbles”, I grabbed your card and want to connect.
 
@@ -92,8 +51,8 @@ Name: ${trimmedName || "Not provided"}
 Email: ${trimmedEmail || "Not provided"}
 Phone: ${trimmedPhone || "Not provided"}
 
-Shareable contact:
-${shareableContactCard}`;
+Shareable contact link (tap to import on iPhone or Android):
+${shareableContactUrl}`;
 
     const encodedBody = encodeURIComponent(smsBody);
     const ua = navigator.userAgent || "";
